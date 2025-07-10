@@ -1,7 +1,6 @@
-// store/authStore.js
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import { request } from "../util/request";
+import { request } from "../util/request"; // Make sure request handles BASE_URL correctly
 
 export const useAuthStore = create(
   persist(
@@ -10,105 +9,98 @@ export const useAuthStore = create(
       token: null,
       loading: false,
       error: null,
-       setToken: (newToken) => set({ token: newToken }),
-  getToken: () => get().token,
 
+      // Login with email/password
       login: async (email, password) => {
         set({ loading: true, error: null });
         try {
           const res = await request("/login", "POST", { email, password });
           const { user, token } = res || {};
-          if (!user || !token) {
-            throw new Error("Invalid login response. Please try again.");
-          }
+          if (!user || !token) throw new Error("Invalid login response.");
           set({ user, token });
           return { user, token };
         } catch (err) {
-          const errorMsg =
-            err?.response?.data?.error || err.message || "Login failed";
-          set({ error: errorMsg });
-          throw new Error(errorMsg);
+          const msg = err?.message || "Login failed";
+          set({ error: msg });
+          throw new Error(msg);
         } finally {
           set({ loading: false });
         }
       },
 
-register: async ({ name, email, password, confirmPassword }) => {
-  set({ loading: true, error: null });
-  try {
-    console.log("Register payload:", { name, email, password, confirmPassword });
+      // Register
+      register: async (name, email, password, password_confirmation) => {
+        set({ loading: true, error: null });
+        try {
+          const res = await request("/register", "POST", {
+            name,
+            email,
+            password,
+            password_confirmation,
+          });
+          const { user, token } = res || {};
+          if (!user || !token) throw new Error("Invalid registration response.");
+          set({ user, token });
+          return { user, token };
+        } catch (err) {
+          const msg = err?.message || "Registration failed";
+          set({ error: msg });
+          throw new Error(msg);
+        } finally {
+          set({ loading: false });
+        }
+      },
 
-    const res = await request('/register', 'POST', {
-      name,
-      email,
-      password,
-      password_confirmation: confirmPassword,  // Laravel expects this key
-    });
+  //     // Fetch user using current token
+  //    fetchUser: async () => {
+  //   set({ loading: true, error: null });
+  //   try {
+  //     const res = await request('/profile', 'GET');
+  //     set({ user: res, loading: false });
+  //   } catch (err) {
+  //     set({ error: err.message || 'Failed to fetch user', loading: false });
+  //   }
+  // },
 
-    const { user, token } = res || {};
+      // Used in Social Login (Google callback)
+      loginWithToken: async (token) => {
+        set({ loading: true, error: null });
+        try {
+          set({ token }); // Save token temporarily
 
-    if (!user || !token) throw new Error('Invalid registration response');
+          const res = await request("/user", "GET", null, {
+            Authorization: `Bearer ${token}`,
+          });
 
-    set({ user, token });
+          if (!res?.user) throw new Error("Failed to fetch user data.");
+          set({ user: res.user });
+          return res.user;
+        } catch (err) {
+          set({ user: null, token: null, error: err.message || "Login with token failed" });
+          throw err;
+        } finally {
+          set({ loading: false });
+        }
+      },
 
-    return { user, token };
-  } catch (err) {
-    console.error("Register error response data:", err.response?.data);
-
-    if (err.response?.data?.errors) {
-      for (const [field, messages] of Object.entries(err.response.data.errors)) {
-        console.error(`Validation error on ${field}: ${messages.join(', ')}`);
-      }
-    }
-
-    const errorMsg = err?.response?.data?.message || err.message || 'Registration failed';
-
-    set({ error: errorMsg });
-    throw new Error(errorMsg);
-  } finally {
-    set({ loading: false });
-  }
-},
-
-
-
-
+      // Logout
       logout: async () => {
         try {
-          await request("/logout", "POST");
+          await request("/logout", "POST", null, {
+            Authorization: `Bearer ${get().token}`,
+          });
         } catch (err) {
-          console.warn("Logout request failed:", err);
-        } finally {
-          set({ user: null, token: null });
+          console.warn("Logout API failed", err);
         }
+        set({ user: null, token: null });
       },
 
+      // Token getter
       getToken: () => get().token,
-
-      fetchUser: async () => {
-        try {
-          const res = await request("/me", "GET");
-          set({ user: res.user });
-        } catch (err) {
-          console.error("Failed to fetch user:", err);
-          get().logout();
-        }
-      },
-
-      refreshToken: async () => {
-        try {
-          const res = await request("/refresh", "POST");
-          set({ token: res.token });
-          return res.token;
-        } catch (err) {
-          console.error("Token refresh failed:", err);
-          get().logout();
-        }
-      },
     }),
     {
       name: "auth-storage",
-      storage: createJSONStorage(() => sessionStorage), // or localStorage
+      storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({ token: state.token, user: state.user }),
     }
   )
