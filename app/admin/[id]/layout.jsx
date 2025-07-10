@@ -2,19 +2,30 @@
 
 import Link from 'next/link';
 import { useParams, usePathname } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useUserStore } from '../../store/userStore';
 
 export default function AdminLayout({ children }) {
   const { id } = useParams();
   const pathname = usePathname();
-
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // ✅ Use Zustand store
+  const user = useUserStore((state) => state.user);
+  const fetchUser = useUserStore((state) => state.fetchUser);
 
   const links = [
     { href: `/admin/${id}/dashboard`, label: 'Dashboard' },
     { href: `/admin/${id}/users`, label: 'Users' },
-    { href: `/admin/${id}/request`, label: 'Requests' }, // fixed typo here
+    { href: `/admin/${id}/request`, label: 'Requests' },
+    { href: `/admin/${id}/profile`, label: 'Profile' },
+
   ];
+
+  // ✅ Fetch user on first render
+  useEffect(() => {
+    fetchUser();
+  }, [fetchUser]);
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
@@ -23,7 +34,7 @@ export default function AdminLayout({ children }) {
         <div className="container mx-auto flex items-center justify-between px-6 py-4">
           <div className="text-2xl font-bold tracking-wide">Admin Panel</div>
 
-          {/* Desktop menu */}
+          {/* Desktop Menu */}
           <ul className="hidden md:flex space-x-8 items-center">
             {links.map(({ href, label }) => (
               <li key={href}>
@@ -40,8 +51,23 @@ export default function AdminLayout({ children }) {
               </li>
             ))}
 
-            {/* Notifications placeholder */}
-            {/* <li><NotificationBell adminId={id} /></li> */}
+            {/* Admin Info */}
+            {user && (
+              <li className="flex items-center space-x-2">
+                {user.profile_image_url ? (
+                  <img
+                    src={user.profile_image_url}
+                    alt="Admin Avatar"
+                    className="h-8 w-8 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="h-8 w-8 rounded-full bg-indigo-500 flex items-center justify-center text-white text-sm font-bold">
+                    {user.name?.[0]?.toUpperCase() ?? '?'}
+                  </div>
+                )}
+                <span className="text-sm">{user.name}</span>
+              </li>
+            )}
 
             <li>
               <Link href="/login" className="hover:text-red-400 transition-colors duration-200">
@@ -64,19 +90,9 @@ export default function AdminLayout({ children }) {
               xmlns="http://www.w3.org/2000/svg"
             >
               {mobileMenuOpen ? (
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               ) : (
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 6h16M4 12h16M4 18h16"
-                />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
               )}
             </svg>
           </button>
@@ -101,6 +117,24 @@ export default function AdminLayout({ children }) {
               </li>
             ))}
 
+            {/* Admin Info */}
+            {user && (
+              <li className="flex items-center space-x-2 mt-2">
+                {user.profile_image_url ? (
+                  <img
+                    src={user.profile_image_url}
+                    alt="Admin Avatar"
+                    className="h-8 w-8 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="h-8 w-8 rounded-full bg-indigo-500 flex items-center justify-center text-white text-sm font-bold">
+                    {user.name?.[0]?.toUpperCase() ?? '?'}
+                  </div>
+                )}
+                <span className="text-sm text-white">{user.name}</span>
+              </li>
+            )}
+
             <li>
               <Link
                 href="/login"
@@ -114,7 +148,7 @@ export default function AdminLayout({ children }) {
         )}
       </nav>
 
-      {/* Main content */}
+      {/* Main Content */}
       <main className="flex-grow container mx-auto px-6 py-8">{children}</main>
 
       {/* Footer */}
